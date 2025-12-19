@@ -1,168 +1,209 @@
-(function($){
-  'use strict';
+/**
+ * RS Installments - Ultimate Hunter Injector
+ * Version: 2.1.0 (Fix for "It didn't work")
+ */
 
-  const RSIP = {
-      config: {},
-      
-      init: function() {
-          // Read localized data
-          if (typeof RSIP_DATA !== 'undefined') {
-              this.config = RSIP_DATA;
-          }
-          
-          this.moveBox();
-          this.bindEvents();
-      },
+(function($) {
+    'use strict';
 
-      // Helper: Format number like WooCommerce
-      formatMoney: function(amount) {
-          let n = parseFloat(amount).toFixed(0);
-          // Simple thousand separator for display
-          let formatted = n.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-          // Add currency symbol (simple append/prepend based on simple check or config)
-          // Ideally we should use wc_price_format but that's complex in pure JS.
-          // Using symbol passed from PHP
-          const symbol = this.config.currency_symbol || '';
-          return this.config.is_rtl ? (formatted + ' ' + symbol) : (symbol + formatted);
-      },
+    const RSIP = {
+        config: {},
+        interval: null,
+        attempts: 0,
+        maxAttempts: 40, // 40 * 100ms = 4 seconds aggressive search
 
-      // Logic: Calculate payment details based on config & plans
-      calculate: function($box, currentPrice) {
-          const configRaw = $box.attr('data-rsip-config');
-          if(!configRaw) return;
-          
-          const settings = JSON.parse(configRaw);
-          const plans    = settings.plans || [];
-          const rounding = parseInt(settings.rounding || 0);
-          
-          // Calc Down Payment
-          let downAmount = 0;
-          if (settings.down_pct > 0) {
-              downAmount = currentPrice * (settings.down_pct / 100);
-          } else if (settings.down_fix > 0) {
-              downAmount = Math.min(currentPrice, settings.down_fix);
-          }
-          
-          const principal = Math.max(0, currentPrice - downAmount);
-          
-          // Update UI: Price & Down Payment
-          $box.find('.rsip-price-display').html( this.formatMoney(currentPrice) );
-          if(downAmount > 0) {
-              $box.find('.rsip-down-display').html( this.formatMoney(downAmount) );
-              $box.find('.rsip-row-down').show();
-          } else {
-              $box.find('.rsip-row-down').hide();
-          }
+        init: function() {
+            if (typeof RSIP_DATA !== 'undefined') {
+                this.config = RSIP_DATA;
+            }
 
-          // Loop through each plan item in DOM and update
-          $box.find('.rsip-plan-item').each((i, el) => {
-              const $row = $(el);
-              const months = parseInt($row.data('months'));
-              
-              // Find matching plan config
-              const plan = plans.find(p => parseInt(p.months) === months);
-              if (!plan) return;
+            // Start the hunt immediately
+            this.startHunting();
+            
+            // Listen for WooCommerce variation changes
+            this.bindEvents();
+        },
 
-              const rate = parseFloat(plan.rate);
-              let monthly = 0;
-              let total = 0;
+        startHunting: function() {
+            const self = this;
+            // Check every 100ms
+            this.interval = setInterval(function() {
+                self.attempts++;
+                const success = self.tryInject();
+                
+                // Stop if successful or timeout
+                if (success || self.attempts >= self.maxAttempts) {
+                    clearInterval(self.interval);
+                    if(!success) console.log('RSIP: Could not auto-inject box after 4 seconds.');
+                }
+            }, 100);
+        },
 
-              if (settings.type === 'apr') {
-                  // APR Calculation
-                  const r = rate / 100;
-                  if (r <= 0) {
-                      monthly = principal / months;
-                  } else {
-                      const pow = Math.pow(1 + r, months);
-                      monthly = (principal * r * pow) / (pow - 1);
-                  }
-              } else {
-                  // Markup Calculation (matches PHP logic)
-                  const totalWithMarkup = principal * (rate > 0 ? (1 + rate / 100) : 1);
-                  monthly = totalWithMarkup / months;
-              }
+        tryInject: function() {
+            // 1. Find the Source Box (Generated in Footer)
+            const $wrapper = $('#rsip-autobox-wrapper');
+            let $box = $wrapper.find('.rsip-box');
+            
+            // If wrapper is gone, maybe we already moved it? Check visibility.
+            if (!$wrapper.length) {
+                if ($('.rsip-box:visible').length > 0) return true; // Already done
+                // If box exists but hidden elsewhere
+                $box = $('.rsip-box').first();
+            }
 
-              // Apply Rounding
-              if (rounding > 0) {
-                  monthly = Math.round(monthly / rounding) * rounding;
-              }
-              
-              total = downAmount + (monthly * months);
+            if (!$box.length) return false; // Source not ready yet
 
-              // Update DOM
-              $row.find('.rsip-monthly-val').html( RSIP.formatMoney(monthly) );
-              $row.find('.rsip-total-val').html( RSIP.formatMoney(total) );
-          });
-      },
+            // 2. Find the Target Destination
+            let $target = $();
+            let method = 'insertAfter'; // default method
 
-      moveBox: function() {
-          if (!this.config.auto_inject) return;
-          
-          const $wrapper = $('#rsip-autobox-wrapper');
-          if (!$wrapper.length) return;
-          
-          const $box = $wrapper.find('.rsip-box');
-          
-          // Find target
-          let $target = $();
-          if (this.config.target_selector) {
-              $target = $(this.config.target_selector).first();
-          }
-          if (!$target.length && this.config.target_class) {
-              $target = $('.' + this.config.target_class).first();
-          }
-          
-          // Fallback: Entry Summary
-          if (!$target.length) {
-              $target = $('.summary.entry-summary, .product .summary').first();
-              if ($target.length) {
-                  $box.appendTo($target); // Append to bottom of summary
-              }
-          } else {
-              $box.insertAfter($target); // Insert after found price/element
-          }
-          
-          $wrapper.remove(); // Clean up wrapper
-          $box.show();
-      },
+            // Priority A: User Selector (e.g., .elementor-widget-container)
+            if (this.config.target_selector) {
+                try {
+                    $target = $(this.config.target_selector).first();
+                    // If user selected a container (like a div), usually we want to append inside it
+                    if ($target.length) method = 'appendTo'; 
+                } catch(e) {}
+            }
 
-      bindEvents: function() {
-          // Listen to WooCommerce Variation Changes
-          // 'found_variation' passes (event, variation)
-          $('form.variations_form').on('found_variation', function(event, variation) {
-              const price = variation.display_price; // WC provides numeric price here!
-              const $box = $('.rsip-box');
-              
-              if (price && $box.length) {
-                  $box.addClass('loading');
-                  RSIP.calculate($box, price);
-                  $box.removeClass('loading');
-              }
-          });
+            // Priority B: Specific Class
+            if (!$target.length && this.config.target_class) {
+                $target = $('.' + this.config.target_class).first();
+            }
 
-          // Listen to Reset Variation
-          $('form.variations_form').on('reset_data', function() {
-              // Reset to base price (stored in data-base-price on load)
-              const $box = $('.rsip-box');
-              const basePrice = parseFloat($box.attr('data-base-price'));
-              if (basePrice) {
-                  RSIP.calculate($box, basePrice);
-              }
-          });
+            // Priority C: Intelligent Fallbacks (High positions)
+            if (!$target.length) {
+                // Try 1: After Price (Standard WC)
+                $target = $('.summary .price').first();
+                method = 'insertAfter';
+                
+                // Try 2: After Title (If price is missing/hidden)
+                if (!$target.length) {
+                    $target = $('.product_title').first();
+                    method = 'insertAfter';
+                }
+                
+                // Try 3: Before Add to Cart Form
+                if (!$target.length) {
+                    $target = $('form.cart').first();
+                    method = 'insertBefore';
+                }
+            }
 
-          // Listen to Quantity Change (Optional: if total price should multiply by qty)
-          // Usually installments are calculated Per Unit, but if you want Total Cart Value logic:
-          /*
-          $('input.qty').on('change', function() {
-               // Logic to multiply price by qty if needed
-          });
-          */
-      }
-  };
+            // 3. Execute Move
+            if ($target.length) {
+                if (method === 'appendTo') {
+                    $box.appendTo($target);
+                } else if (method === 'insertBefore') {
+                    $box.insertBefore($target);
+                } else {
+                    $box.insertAfter($target);
+                }
 
-  // Run on DOM Ready
-  $(function(){
-      RSIP.init();
-  });
+                // Force Visibility
+                $wrapper.remove(); // Kill the wrapper
+                $box.css({
+                    'display': 'block',
+                    'opacity': 1,
+                    'visibility': 'visible',
+                    'margin-top': '15px',
+                    'margin-bottom': '15px'
+                });
+                
+                return true; // Success!
+            }
+
+            return false; // Keep trying
+        },
+
+        formatMoney: function(amount) {
+            let n = Math.round(parseFloat(amount));
+            let formatted = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            const symbol = this.config.currency_symbol || '';
+            return this.config.is_rtl ? (formatted + ' ' + symbol) : (symbol + formatted);
+        },
+
+        calculate: function($box, currentPrice) {
+            const configRaw = $box.attr('data-rsip-config');
+            if (!configRaw) return;
+            
+            const settings = JSON.parse(configRaw);
+            const plans = settings.plans || [];
+            const rounding = parseInt(settings.rounding || 0);
+            
+            let downAmount = 0;
+            if (settings.down_pct > 0) {
+                downAmount = currentPrice * (settings.down_pct / 100);
+            } else if (settings.down_fix > 0) {
+                downAmount = Math.min(currentPrice, settings.down_fix);
+            }
+            
+            const principal = Math.max(0, currentPrice - downAmount);
+            
+            $box.find('.rsip-price-display').text( this.formatMoney(currentPrice) );
+            
+            const $downRow = $box.find('.rsip-row-down');
+            if (downAmount > 0) {
+                $box.find('.rsip-down-display').text( this.formatMoney(downAmount) );
+                $downRow.slideDown();
+            } else {
+                $downRow.slideUp();
+            }
+
+            $box.find('.rsip-plan-item').each((i, el) => {
+                const $row = $(el);
+                const months = parseInt($row.data('months'));
+                const plan = plans.find(p => parseInt(p.months) === months);
+                if (!plan) return;
+
+                const rate = parseFloat(plan.rate);
+                let monthly = 0, total = 0;
+
+                if (settings.type === 'apr') {
+                    const r = rate / 100;
+                    if (r <= 0) monthly = principal / months;
+                    else {
+                        const pow = Math.pow(1 + r, months);
+                        monthly = (pow === 1) ? principal/months : (principal * r * pow) / (pow - 1);
+                    }
+                } else {
+                    const totalInterestRate = (rate * months) / 100.0;
+                    monthly = (principal * (1 + totalInterestRate)) / months;
+                }
+
+                if (rounding > 0) monthly = Math.round(monthly / rounding) * rounding;
+                total = downAmount + (monthly * months);
+
+                $row.find('.rsip-monthly-val').text( RSIP.formatMoney(monthly) );
+                $row.find('.rsip-total-val').text( RSIP.formatMoney(total) );
+            });
+        },
+
+        bindEvents: function() {
+            const self = this;
+            $(document).on('found_variation', 'form.variations_form', function(event, variation) {
+                const $box = $('.rsip-box');
+                if (variation.display_price !== undefined && variation.display_price !== '') {
+                    $box.addClass('loading');
+                    self.calculate($box, variation.display_price);
+                    setTimeout(() => $box.removeClass('loading'), 200);
+                }
+            });
+
+            $(document).on('reset_data', 'form.variations_form', function() {
+                const $box = $('.rsip-box');
+                const basePrice = parseFloat($box.attr('data-base-price'));
+                if (basePrice) {
+                    $box.addClass('loading');
+                    self.calculate($box, basePrice);
+                    setTimeout(() => $box.removeClass('loading'), 200);
+                }
+            });
+        }
+    };
+
+    $(document).ready(function() {
+        RSIP.init();
+    });
 
 })(jQuery);
