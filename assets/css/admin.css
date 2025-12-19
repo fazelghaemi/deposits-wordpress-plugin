@@ -1,0 +1,316 @@
+/**
+ * RS Installments - Masterpiece Admin Styles
+ * Inspired by Google Material Design 3 & WordPress Core
+ * -----------------------------------------------------------------------------
+ * Version:     2.1.0
+ * Author:      Ready Studio
+ * -----------------------------------------------------------------------------
+ */
+
+ :root {
+    /* --- Core Palette (Based on WP Admin but Enhanced) --- */
+    --rsip-primary: #2271b1;       /* WP Blue */
+    --rsip-primary-hover: #135e96;
+    --rsip-primary-focus: rgba(34, 113, 177, 0.2);
+    
+    --rsip-surface: #ffffff;       /* Card Background */
+    --rsip-bg: #f0f2f5;            /* Page Background */
+    
+    --rsip-text-main: #1d2327;     /* High Emphasis */
+    --rsip-text-secondary: #50575e;/* Medium Emphasis */
+    --rsip-text-muted: #8c8f94;    /* Low Emphasis */
+    
+    --rsip-border: #dcdcde;
+    --rsip-border-hover: #8c8f94;
+    
+    /* --- Elevation & Depth --- */
+    --rsip-shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02);
+    --rsip-shadow-hover: 0 4px 8px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.03);
+    
+    /* --- Layout --- */
+    --rsip-radius: 12px;           /* Modern rounded corners */
+    --rsip-spacing: 24px;
+}
+
+/* 1. Global Container Reset */
+.rsip-settings-wrap {
+    max-width: 960px;
+    margin: 30px auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    color: var(--rsip-text-main);
+}
+
+.rsip-settings-wrap h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 30px;
+    color: var(--rsip-text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 2. Card Design (Google Material Style) */
+.rsip-card {
+    background: var(--rsip-surface);
+    border: 1px solid var(--rsip-border);
+    border-radius: var(--rsip-radius);
+    padding: var(--rsip-spacing);
+    margin-bottom: var(--rsip-spacing);
+    box-shadow: var(--rsip-shadow-card);
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.rsip-card:hover {
+    box-shadow: var(--rsip-shadow-hover);
+    border-color: #c3c4c7;
+}
+
+/* Card Header Strip (Optional Accent) */
+.rsip-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--rsip-primary);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.rsip-card:hover::before {
+    opacity: 1;
+}
+
+.rsip-card h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f1;
+    color: var(--rsip-text-main);
+}
+
+/* 3. Form Table Layout Improvements */
+.form-table {
+    margin: 0 !important;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 15px; /* Add space between rows */
+}
+
+.form-table th {
+    padding: 0 0 10px 0 !important; /* Stack label on mobile, side on desktop */
+    font-weight: 500;
+    color: var(--rsip-text-main);
+    font-size: 14px;
+    width: 250px;
+    vertical-align: top;
+}
+
+.form-table td {
+    padding: 0 !important;
+    vertical-align: top;
+}
+
+/* Responsive adjustment for labels */
+@media (max-width: 782px) {
+    .form-table th { width: auto; padding-bottom: 5px !important; }
+}
+
+/* 4. Input Fields Styling (Material Design Inputs) */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+    width: 100%;
+    max-width: 100%; /* Fluid width */
+    height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--rsip-border);
+    border-radius: 8px; /* Softer radius */
+    background-color: #fff;
+    color: var(--rsip-text-main);
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+}
+
+textarea {
+    height: auto;
+    padding: 12px 16px;
+    min-height: 120px;
+    font-family: 'Fira Code', Consolas, Monaco, monospace; /* Code font for textarea */
+    line-height: 1.6;
+}
+
+/* Input Focus State */
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--rsip-primary);
+    box-shadow: 0 0 0 4px var(--rsip-primary-focus) !important;
+    outline: none;
+}
+
+/* Input Hover State */
+input:hover,
+select:hover,
+textarea:hover {
+    border-color: var(--rsip-border-hover);
+}
+
+/* Placeholder Styling */
+::placeholder {
+    color: #a7aaad;
+}
+
+/* Small Inputs (e.g. percentages) */
+.small-text {
+    width: 100px !important;
+    text-align: center;
+}
+
+/* 5. Select Box Custom Arrow */
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7z%22%20fill%3D%22%2350575e%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: left 12px top 50%; /* RTL support: arrow on left */
+    background-size: 16px;
+    padding-left: 40px !important; /* Space for arrow in RTL */
+}
+
+/* RTL Specifics */
+[dir="rtl"] select {
+    background-position: left 12px top 50%;
+    padding-left: 40px !important;
+    padding-right: 16px !important;
+}
+
+/* 6. Descriptions & Help Text */
+.description {
+    color: var(--rsip-text-secondary);
+    font-size: 13px;
+    margin-top: 8px;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 7. Modern Toggle Switch (Replaces Checkbox) */
+/* Wrapper for positioning */
+.rsip-toggle-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* Hide default checkbox */
+input[type="checkbox"][name*="rsip"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* The visual toggle track */
+input[type="checkbox"][name*="rsip"] + label {
+    display: inline-block;
+    width: 48px;
+    height: 28px;
+    background-color: #e2e4e7;
+    border-radius: 20px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    vertical-align: middle;
+}
+
+/* The toggle thumb */
+input[type="checkbox"][name*="rsip"] + label::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 4px; /* Default RTL: Start from right */
+    width: 20px;
+    height: 20px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* RTL specific toggle logic */
+[dir="rtl"] input[type="checkbox"][name*="rsip"] + label::after {
+    right: 4px;
+    left: auto;
+}
+
+/* Checked State */
+input[type="checkbox"][name*="rsip"]:checked + label {
+    background-color: var(--rsip-primary);
+}
+
+[dir="rtl"] input[type="checkbox"][name*="rsip"]:checked + label::after {
+    transform: translateX(-20px); /* Move left in RTL */
+}
+
+/* 8. Dynamic Rows Styling (Conditional Fields) */
+.rsip-simple-row,
+.rsip-advanced-row {
+    background: #f8f9fa;
+    border: 1px dashed var(--rsip-border);
+    padding: 20px;
+    border-radius: var(--rsip-radius);
+    margin-top: 15px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 9. Submit Button Area (Sticky Footer feeling) */
+.submit {
+    margin-top: 40px !important;
+    padding: 20px !important;
+    background: #fff;
+    border-top: 1px solid var(--rsip-border);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.03);
+    border-radius: var(--rsip-radius);
+    text-align: left; /* Button on left in RTL */
+}
+
+.button-primary {
+    background: var(--rsip-primary) !important;
+    border-color: var(--rsip-primary) !important;
+    padding: 8px 32px !important;
+    height: auto !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(34, 113, 177, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.button-primary:hover {
+    background: var(--rsip-primary-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(34, 113, 177, 0.4) !important;
+}
+
+.button-primary:active {
+    transform: translateY(0);
+    box-shadow: none !important;
+}

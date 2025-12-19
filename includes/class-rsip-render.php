@@ -1,127 +1,365 @@
 <?php
-if ( ! defined('ABSPATH') ) exit;
+/**
+ * RS Installments - Render Class
+ *
+ * This class handles the rendering logic for the installment box.
+ * It processes shortcodes, calculates installment plans based on settings,
+ * determines down payments, and loads the appropriate template view.
+ *
+ * @package     RS_Installments
+ * @subpackage  Includes
+ * @author      Ready Studio
+ * @version     2.0.0
+ */
+
+if ( ! defined('ABSPATH') ) {
+    exit; // Exit if accessed directly for security.
+}
 
 class RSIP_Render {
+
+    /**
+     * The single instance of the class.
+     *
+     * @var RSIP_Render
+     */
     private static $instance = null;
-    public static function instance(){
-        if (self::$instance === null) self::$instance = new self();
+
+    /**
+     * Singleton Pattern: Returns the single instance of this class.
+     *
+     * @return RSIP_Render
+     */
+    public static function instance() {
+        if ( self::$instance === null ) {
+            self::$instance = new self();
+        }
         return self::$instance;
     }
 
-    /** Shortcode handler */
-    public static function shortcode($atts){
-        $s = RSIP_Settings::get();
-        $atts = shortcode_atts([
-            'months'       => $s['months'],
-            'type'         => $s['calc_type'],
-            'rate'         => $s['monthly_rate'],
-            'down'         => '',                 // درصد
-            'down_fixed'   => '',                 // مبلغ
-            'title'        => __('خرید اقساطی','rs-installments'),
-            'class'        => '',
-            'payment_type' => $s['payment_label'],
-        ], $atts, 'wc_installment_prices');
+    /**
+     * Main Shortcode Handler: [wc_installment_prices]
+     *
+     * This method orchestrates the entire process:
+     * 1. Fetches settings.
+     * 2. Identifies the current product context.
+     * 3. Validates price thresholds.
+     * 4. Calculates financial data (interest, installments, down payment).
+     * 5. Determines the UI design variant.
+     * 6. Renders the template.
+     *
+     * @param array $atts Shortcode attributes passed by the user.
+     * @return string The rendered HTML of the installment box.
+     */
+    public static function shortcode( $atts ) {
+        // Retrieve global settings from the database
+        $settings = RSIP_Settings::get();
+        
+        // Merge user-provided attributes with defaults and global settings
+        // This allows per-shortcode overrides for flexibility.
+        $atts = shortcode_atts( [
+            'id'            => '', // Specific Product ID (optional)
+            'title'         => isset($settings['box_title']) ? $settings['box_title'] : '',
+            'payment_label' => isset($settings['payment_label']) ? $settings['payment_label'] : '',
+            'class'         => '', // Custom CSS class
+        ], $atts, 'wc_installment_prices' );
 
-        if ( ! function_exists('wc_get_product') ) return '';
+        // ---------------------------------------------------------------------
+        // 1. Context Resolution: Determine which product we are dealing with.
+        // ---------------------------------------------------------------------
+        $product = null;
 
-        global $product;
-        if ( ! $product instanceof WC_Product ) $product = wc_get_product(get_the_ID());
-        if ( ! $product ) return '';
-
-        $base_price = wc_get_price_to_display($product); // respects tax display
-        if ( $base_price <= 0 ) return '';
-
-        $months_raw = array_filter(array_map('trim', explode(',', (string)$atts['months'])));
-        $months = [];
-        foreach($months_raw as $m){ $mi=absint($m); if($mi>0) $months[]=$mi; }
-        if (empty($months)) $months = [8,10,12];
-
-        $type   = in_array($atts['type'], ['markup','apr'], true) ? $atts['type'] : 'markup';
-        $rate   = floatval($atts['rate']); // monthly %
-        $title  = sanitize_text_field($atts['title']);
-        $class  = sanitize_html_class($atts['class']);
-        $paylbl = sanitize_text_field($atts['payment_type']);
-
-        // down payment
-        $g = RSIP_Settings::get();
-        $down_percent = ($atts['down'] !== '') ? floatval($atts['down']) : floatval($g['down_percent']);
-        $down_fixed   = ($atts['down_fixed'] !== '') ? floatval($atts['down_fixed']) : floatval($g['down_fixed']);
-
-        if ($down_percent > 0){
-            $down_amount = $base_price * ($down_percent/100.0);
-            $down_note   = sprintf(__('پیش‌پرداخت (%s%%)','rs-installments'), round($down_percent,2));
-        } elseif ($down_fixed > 0){
-            $down_amount = min($base_price, $down_fixed);
-            $down_note   = __('پیش‌پرداخت (مبلغ ثابت)','rs-installments');
-        } else {
-            $down_amount = 0.0;
-            $down_note   = '';
+        if ( ! empty( $atts['id'] ) ) {
+            // Case A: Explicit ID passed in shortcode
+            $product = wc_get_product( $atts['id'] );
+        } elseif ( function_exists( 'is_product' ) && is_product() ) {
+            // Case B: We are on a Single Product Page
+            $product = wc_get_product( get_the_ID() );
+        } elseif ( in_the_loop() ) {
+            // Case C: We are inside a Loop (e.g., Shop Page, Archives)
+            global $post;
+            if ( $post && isset($post->ID) ) {
+                $product = wc_get_product( $post->ID );
+            }
         }
 
-        $principal = max(0.0, $base_price - $down_amount);
-
-        // helpers
-        $format_money = function($a){ return wc_price( max(0,$a) ); };
-        $round_to = intval($g['rounding'] ?? 0);
-        $rounder = function($a) use ($round_to){
-            if ($round_to > 0) {
-                return round($a / $round_to) * $round_to;
-            }
-            return $a;
-        };
-        $apr_payment = function($P,$n,$monthly_rate_percent){
-            if($n<=0 || $P<=0) return 0.0;
-            $r = max(0.0, floatval($monthly_rate_percent)) / 100.0;
-            if ($r==0.0) return $P / $n;
-            $pow = pow(1+$r, $n);
-            return $P * $r * $pow / ($pow - 1);
-        };
-
-        $items = [];
-        foreach($months as $m){
-            if ($type === 'apr'){
-                $monthly = $apr_payment($principal, $m, $rate);
-                $monthly = $rounder($monthly);
-                $total   = $down_amount + $monthly * $m;
-            } else {
-                // markup simple (increase on principal, not compounded)
-                $total_with_markup = $principal * ( $rate>0 ? (1 + $rate/100.0) : 1 );
-                $monthly = $rounder($total_with_markup / $m);
-                $total   = $down_amount + $monthly * $m;
-            }
-            $items[] = ['months'=>$m, 'monthly'=>$monthly, 'total'=>$total];
+        // Safety Check: If no valid WC_Product object found, abort silently.
+        if ( ! $product instanceof WC_Product ) {
+            return '';
         }
 
-        // Prepare context for template
-        $context = [
-            'title'        => $title,
-            'class'        => $class,
-            'base_price'   => $base_price,
-            'down_amount'  => $down_amount,
-            'down_note'    => $down_note,
-            'items'        => $items,
-            'type'         => $type,
-            'rate'         => $rate,
-            'months'       => $months,
-            'payment_type' => $paylbl,
+        // ---------------------------------------------------------------------
+        // 2. Price Validation & Threshold Check
+        // ---------------------------------------------------------------------
+        // Get the price to display (this handles taxes based on store config).
+        $price = wc_get_price_to_display( $product );
+        
+        // If product is free or price is invalid, do not show the box.
+        if ( $price <= 0 ) {
+            return '';
+        }
+
+        // Check Minimum Price Threshold (Feature Request #1)
+        // If the product price is lower than the configured minimum, hide the box.
+        $min_threshold = isset($settings['min_price']) ? floatval( $settings['min_price'] ) : 0;
+        if ( $min_threshold > 0 && $price < $min_threshold ) {
+            // Return a comment for debugging purposes in HTML source
+            return '<!-- RSIP: Product price (' . $price . ') is below the minimum threshold (' . $min_threshold . '). Box hidden. -->';
+        }
+
+        // ---------------------------------------------------------------------
+        // 3. Plan Construction: Build the roadmap of installments
+        // ---------------------------------------------------------------------
+        $plans = self::build_plans( $settings );
+        
+        // If no valid plans are configured (e.g., empty settings), abort.
+        if ( empty( $plans ) ) {
+            return '<!-- RSIP: No installment plans configured. -->';
+        }
+
+        // ---------------------------------------------------------------------
+        // 4. Financial Calculations
+        // ---------------------------------------------------------------------
+        
+        // A. Calculate Down Payment
+        $down_data = self::calc_down_payment( $price, $settings );
+        
+        // The principal amount is the loan amount (Price - Down Payment).
+        // Ensure it doesn't go below zero.
+        $principal = max( 0.0, $price - $down_data['amount'] );
+
+        // B. Calculate Monthly Payments for each plan
+        $rows = [];
+        $rounding = isset($settings['rounding']) ? intval( $settings['rounding'] ) : 0;
+        $calc_type = isset($settings['calc_type']) ? $settings['calc_type'] : 'markup';
+        
+        foreach ( $plans as $plan ) {
+            $months = intval( $plan['months'] );
+            $rate   = floatval( $plan['rate'] ); // Monthly Interest Rate (%)
+            
+            $monthly_payment = 0.0;
+            $total_payment   = 0.0;
+
+            if ( $months > 0 ) {
+                if ( $calc_type === 'apr' ) {
+                    // --- Banking Formula (Amortization / PMT) ---
+                    // Formula: P * r * (1+r)^n / ((1+r)^n - 1)
+                    // Where r = monthly rate (decimal), n = months
+                    $r = $rate / 100.0;
+                    
+                    if ( $r <= 0 ) {
+                        // Zero interest case
+                        $monthly_payment = $principal / $months;
+                    } else {
+                        $pow = pow( 1 + $r, $months );
+                        // Prevent division by zero if pow is 1 (shouldn't happen with positive rate)
+                        if ( $pow == 1 ) {
+                            $monthly_payment = $principal / $months;
+                        } else {
+                            $monthly_payment = ( $principal * $r * $pow ) / ( $pow - 1 );
+                        }
+                    }
+                } else {
+                    // --- Simple Markup Formula (Market Standard) ---
+                    // Logic: Total Interest = (Monthly Rate * Months)
+                    // Total Amount = Principal * (1 + Total Interest%)
+                    // Monthly Payment = Total Amount / Months
+                    
+                    $total_interest_percent = ( $rate * $months ) / 100.0;
+                    $total_with_markup      = $principal * ( 1.0 + $total_interest_percent );
+                    $monthly_payment        = $total_with_markup / $months;
+                }
+
+                // C. Rounding Logic
+                // Round the monthly payment to the nearest configured integer (e.g., 1000 Tomans).
+                if ( $rounding > 0 ) {
+                    $monthly_payment = round( $monthly_payment / $rounding ) * $rounding;
+                }
+                
+                // D. Total Repayment Calculation
+                // Total = Down Payment + (Monthly Payment * Months)
+                $total_payment = $down_data['amount'] + ( $monthly_payment * $months );
+            }
+
+            // Store the calculated row
+            $rows[] = [
+                'months'  => $months,
+                'rate'    => $rate,
+                'monthly' => $monthly_payment,
+                'total'   => $total_payment
+            ];
+        }
+
+        // ---------------------------------------------------------------------
+        // 5. UI & Design Configuration
+        // ---------------------------------------------------------------------
+        // Determine the design class based on settings (default, modern, horizontal)
+        $design_type = isset( $settings['box_design'] ) ? $settings['box_design'] : 'default';
+        
+        // Sanitize design type to ensure valid CSS class
+        $valid_designs = ['default', 'modern', 'horizontal'];
+        if ( ! in_array( $design_type, $valid_designs, true ) ) {
+            $design_type = 'default';
+        }
+        
+        $design_class = 'rsip-design-' . $design_type;
+        
+        // Combine user custom classes with the design class
+        $final_class = trim( $atts['class'] . ' ' . $design_class );
+
+        // ---------------------------------------------------------------------
+        // 6. Data Preparation & Rendering
+        // ---------------------------------------------------------------------
+        // Prepare configuration JSON for the frontend JavaScript.
+        // This allows JS to perform live recalculations when variations change
+        // without making AJAX calls, ensuring instant feedback.
+        $js_config = [
+            'type'     => $calc_type,
+            'rounding' => $rounding,
+            'plans'    => $plans, // Pass the plan map (months/rates) to JS
+            'down_pct' => isset($settings['down_percent']) ? floatval($settings['down_percent']) : 0,
+            'down_fix' => isset($settings['down_fixed']) ? floatval($settings['down_fixed']) : 0,
         ];
 
+        $context = [
+            'title'         => $atts['title'],
+            'payment_label' => $atts['payment_label'],
+            'class'         => esc_attr( $final_class ),
+            'price'         => $price,
+            'down_data'     => $down_data,
+            'rows'          => $rows,
+            'settings_json' => json_encode( $js_config ),
+        ];
+
+        // Buffer the output to return it as a string
         ob_start();
-        self::template('box.php', $context);
+        self::template( 'box.php', $context );
         return ob_get_clean();
     }
 
-    /** Simple template loader with override support (theme/child-theme) */
-    public static function template($file, $vars = []){
+    /**
+     * Helper: Build Installment Plans
+     *
+     * Parses the settings to create a normalized array of plans.
+     * Handles both 'simple' (fixed rate) and 'advanced' (variable rate) modes.
+     *
+     * @param array $settings The plugin settings array.
+     * @return array Array of plans, each containing ['months' => int, 'rate' => float].
+     */
+    private static function build_plans( $settings ) {
+        $plans = [];
+        $mode = isset( $settings['calc_mode'] ) ? $settings['calc_mode'] : 'simple';
+        
+        if ( $mode === 'advanced' ) {
+            // --- Advanced Mode Parsing ---
+            // Parses a textarea string where each line is "Months|Rate"
+            // Example: "3|1.5 \n 6|2.0"
+            $raw_plan = isset( $settings['advanced_plan'] ) ? $settings['advanced_plan'] : '';
+            $lines = explode( "\n", $raw_plan );
+            
+            foreach ( $lines as $line ) {
+                $parts = explode( '|', $line );
+                if ( count( $parts ) >= 2 ) {
+                    $m = absint( trim( $parts[0] ) );
+                    $r = floatval( trim( $parts[1] ) );
+                    
+                    // Only add if months > 0
+                    if ( $m > 0 ) {
+                        $plans[] = [ 'months' => $m, 'rate' => $r ];
+                    }
+                }
+            }
+        } else {
+            // --- Simple Mode Parsing ---
+            // Parses a comma-separated string for months and uses a single fixed rate.
+            // Example: Months="3,6,12", Rate="3.5"
+            $months_str = isset( $settings['simple_months'] ) ? $settings['simple_months'] : '';
+            $rate       = isset( $settings['simple_rate'] ) ? floatval( $settings['simple_rate'] ) : 0;
+            
+            $ms = explode( ',', $months_str );
+            foreach ( $ms as $m ) {
+                $mi = absint( $m );
+                if ( $mi > 0 ) {
+                    $plans[] = [ 'months' => $mi, 'rate' => $rate ];
+                }
+            }
+        }
+        
+        // Sort plans by month duration (Ascending) for better UX
+        usort( $plans, function( $a, $b ) {
+            return $a['months'] - $b['months'];
+        });
+
+        return $plans;
+    }
+
+    /**
+     * Helper: Calculate Down Payment
+     *
+     * Determines the down payment amount based on percentage or fixed value settings.
+     * Priority Logic: Percentage > Fixed Amount.
+     *
+     * @param float $price The product price.
+     * @param array $settings The plugin settings.
+     * @return array ['amount' => float, 'label' => string]
+     */
+    private static function calc_down_payment( $price, $settings ) {
+        $pct = isset( $settings['down_percent'] ) ? floatval( $settings['down_percent'] ) : 0;
+        $fix = isset( $settings['down_fixed'] ) ? floatval( $settings['down_fixed'] ) : 0;
+        
+        $amount = 0.0;
+        $label  = '';
+
+        // Priority 1: Percentage Down Payment
+        if ( $pct > 0 ) {
+            $amount = $price * ( $pct / 100.0 );
+            $label  = sprintf( __( 'پیش‌پرداخت (%s%%)', 'rs-installments' ), $pct );
+        } 
+        // Priority 2: Fixed Amount Down Payment
+        elseif ( $fix > 0 ) {
+            // Ensure down payment doesn't exceed product price
+            $amount = min( $price, $fix );
+            $label  = __( 'پیش‌پرداخت', 'rs-installments' );
+        }
+
+        return [
+            'amount' => $amount,
+            'label'  => $label
+        ];
+    }
+
+    /**
+     * Template Loader
+     *
+     * Locates and includes the template file.
+     * Supports overriding templates via the theme folder for developer flexibility.
+     * Search Order:
+     * 1. Child Theme: /rs-installments/{file}
+     * 2. Parent Theme: /rs-installments/{file}
+     * 3. Plugin Default: /templates/{file}
+     *
+     * @param string $file The template filename (e.g., 'box.php').
+     * @param array $vars Associative array of variables to pass to the view.
+     */
+    public static function template( $file, $vars = [] ) {
+        // Paths to search for the template
         $paths = [
-            trailingslashit(get_stylesheet_directory()) . 'rs-installments/' . $file,
-            trailingslashit(get_template_directory())   . 'rs-installments/' . $file,
+            trailingslashit( get_stylesheet_directory() ) . 'rs-installments/' . $file,
+            trailingslashit( get_template_directory() )   . 'rs-installments/' . $file,
             RSIP_PATH . 'templates/' . $file,
         ];
-        foreach($vars as $k=>$v){ $$k=$v; }
-        foreach($paths as $p){
-            if (file_exists($p)) { include $p; return; }
+        
+        // Extract variables to local scope so they can be accessed simply as $varname
+        extract( $vars );
+        
+        // Loop through paths and include the first one found
+        foreach ( $paths as $p ) {
+            if ( file_exists( $p ) ) {
+                include $p;
+                return;
+            }
         }
-        echo '<!-- RSIP template missing -->';
+
+        // Fallback or error logging could go here if template is missing
     }
 }

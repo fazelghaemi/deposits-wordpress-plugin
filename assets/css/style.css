@@ -1,0 +1,483 @@
+/**
+ * RS Installments - Professional Stylesheet
+ * -----------------------------------------------------------------------------
+ * Version:     2.0.0
+ * Author:      Ready Studio
+ * Description: Contains all structural and visual styles for the installment box.
+ * Includes 3 distinct design variants: Default, Modern, and Horizontal.
+ * Optimized for RTL (Persian) and fully responsive.
+ * -----------------------------------------------------------------------------
+ */
+
+/* ==========================================================================
+   1. CSS Variables & Theme Configuration
+   ========================================================================== */
+   :root {
+    /* --- Core Colors --- */
+    --rsip-color-primary:       #3b82f6; /* Blue 500 */
+    --rsip-color-primary-dark:  #2563eb; /* Blue 600 */
+    --rsip-color-secondary:     #64748b; /* Slate 500 */
+    --rsip-color-text-main:     #1e293b; /* Slate 800 */
+    --rsip-color-text-muted:    #94a3b8; /* Slate 400 */
+    --rsip-color-success:       #10b981; /* Emerald 500 */
+    --rsip-color-danger:        #ef4444; /* Red 500 */
+    
+    /* --- Backgrounds --- */
+    --rsip-bg-surface:          #ffffff;
+    --rsip-bg-subtle:           #f8fafc; /* Slate 50 */
+    --rsip-bg-highlight:        #eff6ff; /* Blue 50 */
+
+    /* --- Borders & Shadows --- */
+    --rsip-border-light:        #e2e8f0; /* Slate 200 */
+    --rsip-border-focus:        #cbd5e1; /* Slate 300 */
+    --rsip-shadow-sm:           0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --rsip-shadow-md:           0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --rsip-shadow-lg:           0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+    /* --- Dimensions --- */
+    --rsip-radius-sm:           6px;
+    --rsip-radius-md:           8px;
+    --rsip-radius-lg:           12px;
+    --rsip-spacing-unit:        4px;
+}
+
+/* ==========================================================================
+   2. Base Box Structure (Shared Styles)
+   ========================================================================== */
+
+/* Main Container */
+.rsip-box {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin: 20px 0;
+    padding: 20px;
+    background-color: var(--rsip-bg-surface);
+    border: 1px solid var(--rsip-border-light);
+    border-radius: var(--rsip-radius-lg);
+    font-family: inherit; /* Inherit theme font */
+    line-height: 1.6;
+    font-size: 14px;
+    color: var(--rsip-color-text-main);
+    position: relative;
+    /* Clean up float issues from themes */
+    clear: both;
+    isolation: isolate;
+}
+
+/* Ensure all internal elements use border-box */
+.rsip-box *, 
+.rsip-box *::before, 
+.rsip-box *::after {
+    box-sizing: border-box;
+}
+
+/* Loading State (JS Toggles this) */
+.rsip-box.loading {
+    opacity: 0.6;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+/* --------------------------------------------------------------------------
+   2.1. Header Section
+   -------------------------------------------------------------------------- */
+.rsip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rsip-border-light);
+}
+
+.rsip-header-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rsip-title-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--rsip-color-primary);
+    background: var(--rsip-bg-highlight);
+    padding: 6px;
+    border-radius: var(--rsip-radius-sm);
+}
+
+.rsip-title-text {
+    margin: 0;
+    padding: 0;
+    font-size: 1.1em;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--rsip-color-text-main);
+}
+
+/* --------------------------------------------------------------------------
+   2.2. Summary Section (Price, Down Payment)
+   -------------------------------------------------------------------------- */
+.rsip-summary {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rsip-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95em;
+}
+
+.rsip-label {
+    color: var(--rsip-color-text-secondary);
+    font-weight: 500;
+}
+
+.rsip-value {
+    color: var(--rsip-color-text-main);
+    font-weight: 700;
+    font-family: inherit; /* Ensure numbers use Persian/English font correctly */
+}
+
+/* Special Emphasis for Base Price */
+.rsip-price-display {
+    font-size: 1.1em;
+}
+
+/* Down Payment Highlight */
+.rsip-down-display {
+    color: var(--rsip-color-primary-dark);
+}
+
+/* --------------------------------------------------------------------------
+   2.3. Plans Grid System
+   -------------------------------------------------------------------------- */
+.rsip-plans-grid {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+}
+
+/* Base Plan Item Style */
+.rsip-plan-item {
+    position: relative;
+    background-color: var(--rsip-bg-subtle);
+    border: 1px solid var(--rsip-border-light);
+    border-radius: var(--rsip-radius-md);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+    overflow: hidden;
+}
+
+/* Footer Section */
+.rsip-footer {
+    margin-top: 15px;
+    text-align: center;
+    color: var(--rsip-color-text-muted);
+    font-size: 0.8em;
+    border-top: 1px dashed var(--rsip-border-light);
+    padding-top: 10px;
+}
+
+
+/* ==========================================================================
+   3. DESIGN VARIANT: DEFAULT (Classic List)
+   ========================================================================== */
+.rsip-design-default .rsip-plans-grid {
+    grid-template-columns: 1fr; /* Single column stack */
+}
+
+.rsip-design-default .rsip-plan-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+/* Header in Default Design (Left/Right side) */
+.rsip-design-default .rsip-plan-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 80px;
+}
+
+.rsip-design-default .rsip-badge-month {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--rsip-color-text-main);
+}
+
+.rsip-design-default .rsip-badge-rate {
+    font-size: 0.75em;
+    color: var(--rsip-color-text-muted);
+    background: transparent;
+    padding: 0;
+}
+
+/* Body in Default Design */
+.rsip-design-default .rsip-plan-body {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-grow: 1;
+    justify-content: flex-end; /* Push values to end */
+}
+
+.rsip-design-default .rsip-plan-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end; /* Align numbers right (LTR) or left (RTL) */
+    text-align: end;
+}
+
+.rsip-design-default .rsip-meta-label {
+    font-size: 0.75em;
+    color: var(--rsip-color-text-muted);
+    margin-bottom: 2px;
+}
+
+.rsip-design-default .rsip-amount-large {
+    color: var(--rsip-color-primary);
+    font-size: 1.1em;
+}
+
+
+/* ==========================================================================
+   4. DESIGN VARIANT: MODERN (Cards / Grid)
+   ========================================================================== */
+.rsip-design-modern {
+    background: linear-gradient(to bottom, #ffffff, #fafafa);
+    border: none;
+    box-shadow: var(--rsip-shadow-md);
+}
+
+.rsip-design-modern .rsip-header {
+    border-bottom: none;
+    margin-bottom: 20px;
+}
+
+/* Grid Layout for Cards */
+.rsip-design-modern .rsip-plans-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.rsip-design-modern .rsip-plan-item {
+    padding: 0;
+    background: #fff;
+    border: 1px solid var(--rsip-border-light);
+    box-shadow: var(--rsip-shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+
+.rsip-design-modern .rsip-plan-item:hover {
+    border-color: var(--rsip-color-primary);
+    transform: translateY(-4px);
+    box-shadow: var(--rsip-shadow-lg);
+}
+
+/* Modern Card Header */
+.rsip-design-modern .rsip-plan-header {
+    background-color: var(--rsip-bg-highlight);
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--rsip-border-light);
+}
+
+.rsip-design-modern .rsip-badge-month {
+    color: var(--rsip-color-primary-dark);
+    font-weight: 800;
+    font-size: 1.1em;
+}
+
+.rsip-design-modern .rsip-badge-rate {
+    background: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--rsip-color-text-secondary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Modern Card Body */
+.rsip-design-modern .rsip-plan-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rsip-design-modern .rsip-plan-col {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.rsip-design-modern .rsip-monthly-val {
+    font-size: 1.2em;
+    color: var(--rsip-color-text-main);
+}
+
+.rsip-design-modern .rsip-total-val {
+    font-size: 0.95em;
+    color: var(--rsip-color-text-secondary);
+}
+
+/* ==========================================================================
+   5. DESIGN VARIANT: HORIZONTAL (Compact Strip)
+   ========================================================================== */
+.rsip-design-horizontal {
+    padding: 15px;
+}
+
+.rsip-design-horizontal .rsip-header {
+    display: none; /* Minimalist look, hide title */
+}
+
+.rsip-design-horizontal .rsip-summary {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 20px;
+    background: var(--rsip-bg-subtle);
+    padding: 10px 15px;
+    border-radius: var(--rsip-radius-md);
+    margin-bottom: 15px;
+    border: 1px solid var(--rsip-border-light);
+}
+
+.rsip-design-horizontal .rsip-plans-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.rsip-design-horizontal .rsip-plan-item {
+    padding: 10px;
+    text-align: center;
+    border: 2px solid transparent;
+    background: var(--rsip-bg-surface);
+    border: 1px solid var(--rsip-border-light);
+}
+
+.rsip-design-horizontal .rsip-plan-item:hover {
+    border-color: var(--rsip-color-primary);
+    background-color: var(--rsip-bg-highlight);
+}
+
+.rsip-design-horizontal .rsip-plan-header {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    align-items: center;
+}
+
+.rsip-design-horizontal .rsip-badge-month {
+    background: var(--rsip-color-text-main);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.rsip-design-horizontal .rsip-plan-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rsip-design-horizontal .rsip-col-total {
+    display: none; /* Hide total in compact mode to save space */
+}
+
+.rsip-design-horizontal .rsip-monthly-val {
+    font-size: 1.1em;
+    color: var(--rsip-color-primary);
+}
+
+
+/* ==========================================================================
+   6. Responsive Mobile Styles
+   ========================================================================== */
+@media (max-width: 600px) {
+    
+    .rsip-box {
+        padding: 15px;
+        margin: 15px 0;
+    }
+
+    /* Force Modern Design to 1 column on small screens if needed, 
+       but auto-fit usually handles it. Adjusting gap. */
+    .rsip-design-modern .rsip-plans-grid {
+        grid-template-columns: 1fr 1fr; /* 2 columns on mobile for cards usually looks good */
+    }
+
+    @media (max-width: 400px) {
+        .rsip-design-modern .rsip-plans-grid {
+            grid-template-columns: 1fr; /* 1 column on very small screens */
+        }
+    }
+
+    /* Default Design Mobile Adjustments */
+    .rsip-design-default .rsip-plan-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .rsip-design-default .rsip-plan-header {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+        border-bottom: 1px dashed var(--rsip-border-light);
+        padding-bottom: 8px;
+    }
+
+    .rsip-design-default .rsip-plan-body {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .rsip-design-default .rsip-plan-col {
+        align-items: flex-start; /* Reset alignment for stacked view */
+        text-align: right;
+    }
+    
+    /* Horizontal Design Mobile - Collapse to stack */
+    .rsip-design-horizontal .rsip-summary {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .rsip-design-horizontal .rsip-plans-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* ==========================================================================
+   7. RTL Specific Adjustments (Persian)
+   ========================================================================== */
+[dir="rtl"] .rsip-plan-action {
+    margin-right: auto;
+    margin-left: 0;
+}
+
+[dir="rtl"] .rsip-header-content {
+    /* Ensure flex direction is logical, usually browser handles this, 
+       but good to check padding/margins */
+}
+
+/* Fix for icons if they need mirroring */
+[dir="rtl"] .rsip-check-icon {
+    /* transform: scaleX(-1); */
+}
